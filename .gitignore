@@ -1,0 +1,73 @@
+# ---- Trained models (large; teammates train or use synthetic) ----
+models/*.keras
+models/*.h5
+models/*.weights
+models/*_manifest.json
+
+# ---- Dataset files (large; use .gitkeep for folder structure) ----
+data/**/*.npy
+data/**/*.npz
+data/**/*.csv
+data/**/*.txt
+# Keep .gitkeep files
+!data/.gitkeep
+!data/**/.gitkeep
+
+# ---- Runtime outputs ----
+sessions/
+exports/
+*.log
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.local
+
+# ---- IDE / Editor ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- Optional: uncomment to ignore entire data/model contents (keeps .gitkeep) ----
+# data/*
+# !data/.gitkeep
+# !data/ui_prmd/.gitkeep
+# !data/kimore/.gitkeep
+# !data/ntu_rgbd/.gitkeep
+# models/*
+# !models/.gitkeep

@@ -1,0 +1,26 @@
+# Skeleton-Based Rehabilitation Exercise Quality Grading System
+# Python 3.8+
+
+# Deep Learning
+tensorflow>=2.10.0
+keras>=2.10.0
+
+# Pose & Video
+mediapipe>=0.10.0
+opencv-python>=4.8.0
+
+# Data & Utils
+numpy>=1.23.0
+pandas>=1.5.0
+scipy>=1.10.0
+
+# UI
+pygame>=2.5.0
+
+# Config & Logging
+pyyaml>=6.0
+tqdm>=4.65.0
+
+# Optional: Visualization & Logging
+matplotlib>=3.7.0
+tensorboard>=2.12.0
