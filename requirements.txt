@@ -24,3 +24,6 @@ tqdm>=4.65.0
 # Optional: Visualization & Logging
 matplotlib>=3.7.0
 tensorboard>=2.12.0
+
+# Optional: Download training/demo videos from YouTube (scripts/download_training_videos.py)
+# yt-dlp>=2024.1.0

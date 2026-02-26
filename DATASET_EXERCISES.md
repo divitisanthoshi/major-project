@@ -134,6 +134,53 @@ Exact number and names of exercises in each supported dataset.
 
 ---
 
+## Our 23 exercises (YouTube demos + training)
+
+All exercises used for **in-app demo videos** (left panel) and **training** from downloaded YouTube clips. Keys match `main.py`, `config/video_sources.yaml`, and `src/datasets/dataset_exercises.py` (`DEMO_AND_TRAINING_EXERCISES`).
+
+| # | Display name       | Key (config / code)   |
+|---|--------------------|------------------------|
+| 1 | Deep squat         | `deep_squat`           |
+| 2 | Hurdle step        | `hurdle_step`          |
+| 3 | Inline lunge       | `inline_lunge`         |
+| 4 | Side lunge         | `side_lunge`           |
+| 5 | Sit to stand       | `sit_to_stand`         |
+| 6 | Standing leg raise | `standing_leg_raise`   |
+| 7 | Shoulder abduction | `shoulder_abduction`   |
+| 8 | Shoulder extension | `shoulder_extension`   |
+| 9 | Shoulder rotation  | `shoulder_rotation`    |
+| 10 | Shoulder scaption | `shoulder_scaption`    |
+| 11 | Hip abduction     | `hip_abduction`        |
+| 12 | Trunk rotation    | `trunk_rotation`       |
+| 13 | Squat             | `squat`                |
+| 14 | Leg raise         | `leg_raise`            |
+| 15 | Reach and retrieve| `reach_and_retrieve`   |
+| 16 | Wall push-up      | `wall_pushup`          |
+| 17 | Heel raise        | `heel_raise`           |
+| 18 | Bird dog          | `bird_dog`             |
+| 19 | Glute bridge      | `glute_bridge`         |
+| 20 | Clamshell         | `clamshell`            |
+| 21 | Chin tuck         | `chin_tuck`            |
+| 22 | Marching in place | `marching_in_place`    |
+| 23 | Step up           | `step_up`              |
+
+**YouTube videos:** `config/video_sources.yaml` has URLs per exercise. Download into `data/downloaded_videos` with:
+
+```bash
+python scripts/download_training_videos.py --output data/downloaded_videos
+```
+
+**Train on downloaded videos:**
+
+```bash
+python scripts/video_to_skeleton.py --input data/downloaded_videos --output data/custom
+python train.py --dataset custom --output models/rehab_model.keras
+```
+
+Or use the full pipeline: `python scripts/run_train_pipeline.py`
+
+---
+
 ## Summary
 
 | Dataset   | Number of Exercises/Actions | Rehabilitation-focused |
@@ -141,3 +188,4 @@ Exact number and names of exercises in each supported dataset.
 | UI-PRMD   | 10                         | Yes                     |
 | KIMORE    | 5                          | Yes                     |
 | NTU RGB+D | 60                         | Partially (e.g., A8, A9, A41–A49) |
+| **Our app (demos + training)** | **23**            | Yes                     |

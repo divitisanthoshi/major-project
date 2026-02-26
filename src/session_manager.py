@@ -57,9 +57,12 @@ def export_for_power_bi(sessions_paths: List[str] = None) -> str:
     """
     Export sessions to CSV for Power BI import.
     If no paths given, uses all .json in sessions/.
+    Called automatically after each session (ESC); no manual step required.
     """
     ensure_dirs()
     if sessions_paths is None:
+        if not os.path.isdir(SESSION_DIR):
+            return os.path.join(EXPORT_DIR, f"rehab_analytics_{datetime.now().strftime('%Y%m%d')}.csv")
         sessions_paths = [
             os.path.join(SESSION_DIR, f)
             for f in os.listdir(SESSION_DIR)

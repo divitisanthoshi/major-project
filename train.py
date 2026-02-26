@@ -124,6 +124,8 @@ def main():
     parser.add_argument("--model", type=str, default="stgcn", choices=["stgcn", "simplified"])
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
+    parser.add_argument("--fast", action="store_true", help="Fewer epochs (25) and larger batch (64) for quick runs")
+    parser.add_argument("--max-samples", type=int, default=None, help="Cap training data (e.g. 5000) for faster runs; uses random subset")
     parser.add_argument("--output", type=str, default="models/rehab_model.keras")
     parser.add_argument("--config", type=str, default=None)
     args = parser.parse_args()
@@ -163,6 +165,12 @@ def main():
 
     print(f"[Train] Loaded {len(X)} sequences, shape {X.shape}")
 
+    if args.max_samples and len(X) > args.max_samples:
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(X), size=args.max_samples, replace=False)
+        X, y = X[idx], y[idx]
+        print(f"[Train] Subsampled to {len(X)} sequences (--max-samples {args.max_samples})")
+
     # Build model
     if args.model == "stgcn":
         model = build_rehab_grading_model(
@@ -185,8 +193,13 @@ def main():
         )
 
     # Training
-    batch_size = args.batch_size or train_cfg.get("batch_size", 32)
-    epochs = args.epochs or train_cfg.get("epochs", 100)
+    if args.fast:
+        batch_size = args.batch_size or 64
+        epochs = args.epochs or 25
+        print("[Train] Fast mode: epochs=25, batch_size=64")
+    else:
+        batch_size = args.batch_size or train_cfg.get("batch_size", 32)
+        epochs = args.epochs or train_cfg.get("epochs", 100)
     lr = train_cfg.get("learning_rate", 0.001)
 
     model.compile(

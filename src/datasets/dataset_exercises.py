@@ -59,6 +59,36 @@ CUSTOM_NOVEL_EXERCISES = [
     "clamshell", "chin_tuck", "marching_in_place", "step_up",
 ]
 
+# All 23 exercises for YouTube demo videos + training (canonical list)
+# Keys match main.py EXERCISE_NAMES and config/video_sources.yaml
+# "Shoulder leg raise" in UI = shoulder_abduction (Standing shoulder abduction)
+DEMO_AND_TRAINING_EXERCISES = [
+    ("deep_squat", "Deep squat"),
+    ("hurdle_step", "Hurdle step"),
+    ("inline_lunge", "Inline lunge"),
+    ("side_lunge", "Side lunge"),
+    ("sit_to_stand", "Sit to stand"),
+    ("standing_leg_raise", "Standing leg raise"),
+    ("shoulder_abduction", "Shoulder abduction"),   # sometimes shown as "Shoulder leg raise" in UI
+    ("shoulder_extension", "Shoulder extension"),
+    ("shoulder_rotation", "Shoulder rotation"),
+    ("shoulder_scaption", "Shoulder scaption"),
+    ("hip_abduction", "Hip abduction"),
+    ("trunk_rotation", "Trunk rotation"),
+    ("squat", "Squat"),
+    ("leg_raise", "Leg raise"),
+    ("reach_and_retrieve", "Reach and retrieve"),
+    ("wall_pushup", "Wall push-up"),
+    ("heel_raise", "Heel raise"),
+    ("bird_dog", "Bird dog"),
+    ("glute_bridge", "Glute bridge"),
+    ("clamshell", "Clamshell"),
+    ("chin_tuck", "Chin tuck"),
+    ("marching_in_place", "Marching in place"),
+    ("step_up", "Step up"),
+]
+DEMO_AND_TRAINING_KEYS = [k for k, _ in DEMO_AND_TRAINING_EXERCISES]
+
 # UI-PRMD ex_01..ex_10 -> our keys (1:1 for first 10)
 UI_PRMD_TO_OUR = {
     1: "deep_squat", 2: "hurdle_step", 3: "inline_lunge", 4: "side_lunge",

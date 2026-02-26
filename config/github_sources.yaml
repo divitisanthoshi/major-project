@@ -1,0 +1,51 @@
+# When YouTube is not available: GitHub repos and direct download sources for rehab exercise videos/skeleton data.
+# Use these for training data. See docs/TRAINING_VIDEOS.md for how to download and use each.
+#
+# direct_downloads: optional per-exercise list of direct file URLs (HTTP/HTTPS) to download as video.
+#   Each entry can be: a string URL, or { url: "...", filename: "optional_name.mp4" }
+#   Script scripts/download_training_videos.py --config config/github_sources.yaml uses these.
+#
+# github_repos: reference list (name, repo URL, description). Manual download or clone; no auto-download.
+
+github_repos:
+  - name: IntelliRehabDS (IRDS)
+    url: https://github.com/alina-miron/intellirehabds
+    description: 9 rehab gestures, 29 subjects. Skeleton CSV from Zenodo; sample on Google Drive.
+    data_url: https://zenodo.org/record/4610859
+    data_note: "Download SkeletonData.zip (skeleton CSV, not video). For sample videos see repo Google Drive link."
+  - name: KERAAL Dataset
+    url: https://github.com/nguyensmai/KeraalDataset
+    description: Low-back pain rehab, 3 exercises, RGB video + Kinect/OpenPose/BlazePose skeleton.
+    data_url: https://keraal.enstb.org/KeraalDataset.html
+    data_note: "Register/download from project page. Contains mp4/avi videos and skeleton files."
+  - name: UCO Physical Rehabilitation
+    url: https://github.com/AVAuco/ucophyrehab
+    description: 16 activities, 27 subjects, 5 cameras, OptiTrack. Request data by email.
+    data_url: https://www.uco.es/investiga/grupos/ava/portfolio/ucophyrehab/
+    data_note: "Email inforeha@uco.es to request dataset (videos in data/ subject/exercise/cam*.avi)."
+  - name: UI-PRMD (University of Idaho)
+    url: https://webpages.uidaho.edu/ui-prmd/
+    description: 10 rehab movements, Vicon + Kinect skeleton (positions/angles). Public domain.
+    data_url: https://www.kaggle.com/datasets/liza5757/uiprmd
+    data_note: "Download from Kaggle or official site. Skeleton data; use with UI-PRMD loader or convert to our format."
+  - name: 26-Physical-Rehabilitation (MollyEM)
+    url: https://github.com/MollyEM/26-Physical-Rehabilitation
+    description: Deep learning feedback on PT exercises.
+  - name: Physiotherapy Exercise Recognition
+    url: https://github.com/SyedDanishAhmed/Physiotherapy-Exercise-Recognition
+    description: Sensor-based exercise recognition.
+  - name: ExerSights (AI coach)
+    url: https://github.com/ai-coach-pt/exersights
+    description: MediaPipe-based exercise coach; may include demo/sample content.
+
+# Optional: direct file URLs (e.g. Zenodo file, raw GitHub release asset). If you have a direct .mp4 link, add it here.
+# Example for one exercise - uncomment and add real URLs when you have them:
+# direct_downloads:
+#   deep_squat:
+#     quality: good
+#     urls:
+#       - "https://example.com/path/to/deep_squat_demo.mp4"
+#   sit_to_stand:
+#     quality: good
+#     urls:
+#       - "https://zenodo.org/record/XXXXX/files/sit_to_stand_sample.mp4"

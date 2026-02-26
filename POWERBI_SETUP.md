@@ -1,6 +1,6 @@
 # Power BI Dashboard Setup
 
-This project exports session data to CSV for use in Power BI.
+This project exports session data to CSV for use in Power BI. **Export runs automatically** when you end a session (ESC)—no manual export step required.
 
 ## Export Location
 
@@ -53,4 +53,9 @@ print(f"Exported to {path}")
 
 ## Refreshing Data
 
-Re-run the application and complete sessions. Each ESC (end session) updates the CSV. In Power BI, use **Refresh** to reload the data.
+Re-run the application and complete sessions. Each ESC (end session) updates the CSV automatically. In Power BI, use **Refresh** to reload the data.
+
+---
+
+**Training pipeline (no manual steps):** To run download → skeleton extraction → train in one go, use:
+`python scripts/run_full_pipeline.py`

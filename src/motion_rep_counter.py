@@ -35,7 +35,7 @@ MOTION_METRICS = {
 
 
 class MotionRepCounter:
-    def __init__(self, threshold: float = 0.006, min_peak_distance: int = 10, smooth_window: int = 5):
+    def __init__(self, threshold: float = 0.002, min_peak_distance: int = 6, smooth_window: int = 7):
         self.threshold = threshold
         self.min_peak_distance = min_peak_distance
         self.smooth_window = smooth_window
@@ -71,6 +71,7 @@ class MotionRepCounter:
             self.prev_value = val
             return self.reps
         new_dir = "down" if diff > 0 else "up"
+        # Count one rep on down->up (e.g. squat standing up, sit-to-stand)
         if self.direction == "down" and new_dir == "up" and self.frames_since_rep >= self.min_peak_distance:
             self.reps += 1
             self.frames_since_rep = 0

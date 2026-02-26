@@ -22,21 +22,21 @@ class RepetitionCounter:
 
     def __init__(
         self,
-        threshold: float = 0.5,
-        min_peak_distance: int = 10,
-        window_size: int = 5,
+        threshold: float = 0.35,
+        min_peak_distance: int = 8,
+        window_size: int = 12,
     ):
         """
         Args:
-            threshold: Score threshold for counting a rep.
-            min_peak_distance: Minimum frames between consecutive peaks.
-            window_size: Smoothing window for score.
+            threshold: Score threshold for counting a rep (crossing upward).
+            min_peak_distance: Minimum frames between consecutive counts.
+            window_size: Smoothing window for score (smaller = more responsive).
         """
         self.threshold = threshold
         self.min_peak_distance = min_peak_distance
         self.window_size = window_size
         self.count = 0
-        self.score_history: deque = deque(maxlen=64)
+        self.score_history: deque = deque(maxlen=min(64, window_size * 3))
         self._last_peak_frame = -min_peak_distance - 1
         self._above_threshold = False
 
@@ -47,7 +47,9 @@ class RepetitionCounter:
         Counts a rep when: score crosses threshold upward (or downward for "down" exercises).
         """
         self.score_history.append(score)
-        smoothed = np.mean(self.score_history) if self.score_history else score
+        # Use recent window only so we react to current rep quality
+        recent = list(self.score_history)[-self.window_size:] if self.score_history else [score]
+        smoothed = float(np.mean(recent))
 
         now_above = smoothed >= self.threshold
 
