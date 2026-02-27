@@ -128,6 +128,8 @@ def main():
     parser.add_argument("--max-samples", type=int, default=None, help="Cap training data (e.g. 5000) for faster runs; uses random subset")
     parser.add_argument("--output", type=str, default="models/rehab_model.keras")
     parser.add_argument("--config", type=str, default=None)
+    parser.add_argument("--kaggle-npz", type=str, default=None,
+                        help="Path to data.npz on Kaggle (e.g. /kaggle/input/rehab-data/data.npz); skips dataset loaders")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -139,9 +141,14 @@ def main():
     num_joints = model_cfg.get("num_joints", 33)
     in_channels = model_cfg.get("in_channels", 3)
 
-    # Load data
+    # Load data (or from Kaggle .npz)
     train_metadata = {"dataset_mode": args.dataset, "datasets_used": {}}
-    if args.dataset == "all":
+    if args.kaggle_npz and os.path.isfile(args.kaggle_npz):
+        print(f"[Train] Loading from Kaggle npz: {args.kaggle_npz}")
+        data = np.load(args.kaggle_npz)
+        X, y = data["X"], data["y"]
+        train_metadata["datasets_used"] = {"kaggle_npz": len(X)}
+    elif args.dataset == "all":
         print("[Train] Loading all datasets: UI-PRMD, KIMORE, NTU RGB+D, Custom...")
         result = load_all_datasets(config, seq_len=seq_len, num_joints=num_joints, include_custom=True)
         X, y = result[0], result[1]
@@ -202,11 +209,21 @@ def main():
         epochs = args.epochs or train_cfg.get("epochs", 100)
     lr = train_cfg.get("learning_rate", 0.001)
 
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=lr),
-        loss="mse",
-        metrics=["mae"],
-    )
+    # ST-GCN has 2 outputs (score, joint_weights); Keras requires one loss/metrics entry per output
+    n_out = len(model.outputs)
+    if n_out == 2:
+        out_names = model.output_names if hasattr(model, "output_names") else ["output_1", "output_2"]
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=lr),
+            loss={out_names[0]: "mse", out_names[1]: None},
+            metrics={out_names[0]: ["mae"], out_names[1]: []},
+        )
+    else:
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=lr),
+            loss="mse",
+            metrics=["mae"],
+        )
 
     callbacks = [
         keras.callbacks.EarlyStopping(
@@ -226,8 +243,14 @@ def main():
         callbacks.append(keras.callbacks.TensorBoard(log_dir=log_dir))
 
     val_split = train_cfg.get("validation_split", 0.2)
+    # For 2-output models (score + joint_weights), pass dummy target for second output
+    if len(model.outputs) == 2:
+        dummy_weights = np.zeros((len(X), X.shape[2]), dtype=np.float32)  # (N, num_joints)
+        y_targets = [y, dummy_weights]
+    else:
+        y_targets = y
     history = model.fit(
-        X, y,
+        X, y_targets,
         batch_size=batch_size,
         epochs=epochs,
         validation_split=val_split,
