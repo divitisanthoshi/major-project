@@ -6,7 +6,7 @@ downloads URLs (YouTube via yt-dlp, or direct HTTP/HTTPS) into data/downloaded_v
 as <exercise>_<quality>_<index>.mp4 so that scripts/video_to_skeleton.py can process them.
 
 When YouTube is not available, add direct video URLs in video_sources.yaml or in
-config/github_sources.yaml under direct_downloads (see docs/TRAINING_VIDEOS.md).
+config/github_sources.yaml under direct_downloads.
 
 Requires: pip install yt-dlp  (for YouTube). Direct HTTP uses stdlib only.
 """

@@ -1,0 +1,15 @@
+{
+  "dataset": "custom",
+  "num_samples": 757,
+  "shape": [
+    757,
+    64,
+    33,
+    3
+  ],
+  "seq_len": 64,
+  "num_joints": 33,
+  "metadata": {
+    "custom": 757
+  }
+}

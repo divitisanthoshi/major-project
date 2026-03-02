@@ -1,7 +1,8 @@
 """
 Skeleton-Based Rehabilitation Exercise Quality Grading
 
-Layout: Header | Left (Reference/Demo) | Right (You - Live) | Footer
+Layout: Header | Section 1 (Demo video) | Section 2 (Step images/poses) | Section 3 (Live camera) | Footer
+Includes: repetition count, attention-based live feedback (text + audio TTS).
 """
 
 import os
@@ -68,16 +69,57 @@ FOOTER_H = 124
 VIDEO_Y = HEADER_H
 VIDEO_H = WIN_H - HEADER_H - FOOTER_H
 PAD = 24
-# Left panel = reference/demo (skeleton or video), Right = live camera
-LEFT_PANEL_FRAC = 0.42   # fraction of content width for demo (e.g. 42% left, 58% right)
+# Three sections: 1=Demo video, 2=Step images/poses, 3=Live camera
+DEMO_FRAC = 0.28   # fraction of content width for demo
+STEPS_FRAC = 0.28  # fraction for step-by-step images
+LIVE_FRAC = 0.44   # fraction for live camera (largest)
 DEMO_DIR = "data/demos"
-DEMOS_CACHE_DIR = "data/demos_cache"
+STEP_IMAGES_DIR = "data/step_images"  # per-exercise folders: step_01.jpg, step_02.png, etc.
 DEMO_EXTENSIONS = (".mp4", ".webm", ".avi")
 DEMO_YT_MAX_DURATION_SEC = 60  # download only first 60s for in-app playback
 # Show only the exercise clip: skip intro, then loop this duration
-DEMO_SKIP_INTRO_SEC = 5   # skip first N seconds (intro/title)
-DEMO_CLIP_DURATION_SEC = 45  # play only this many seconds then loop (exercise clip)
+DEMO_SKIP_INTRO_SEC = 5   # default skip (intro/title)
+DEMO_CLIP_DURATION_SEC = 45  # default clip length to loop
 DEMO_FLIP_FOR_TEXT = True  # flip demo frame so on-video text is not mirrored
+# Per-exercise (skip_sec, clip_duration_sec) for videos with long intros (~5 min). Add keys only for those.
+DEMO_EXERCISE_CLIP = {
+    "shoulder_rotation": (300, 120),   # skip 5 min intro, then 2 min exercise loop
+    # "deep_squat": (300, 90), "sit_to_stand": (300, 90),  # add if those demos have long intros
+}
+def get_demo_clip(exercise_key: str):
+    """Return (skip_sec, clip_duration_sec) for demo playback; uses default if not in DEMO_EXERCISE_CLIP."""
+    return DEMO_EXERCISE_CLIP.get(exercise_key, (DEMO_SKIP_INTRO_SEC, DEMO_CLIP_DURATION_SEC))
+
+
+# ----- Audio feedback (TTS): speak feedback messages instead of text-only -----
+_tts_last_msg = None
+_tts_last_time = 0.0
+TTS_COOLDOWN_SEC = 2.2  # min seconds between speaking the same message again
+
+def _speak_worker(text: str):
+    """Run in thread: speak text via pyttsx3 (offline TTS)."""
+    try:
+        import pyttsx3
+        engine = pyttsx3.init()
+        engine.setProperty("rate", 160)
+        engine.say(text)
+        engine.runAndWait()
+        engine.stop()
+    except Exception:
+        pass
+
+def speak_feedback(text: str):
+    """Queue feedback for audio output (TTS). Throttled by message and cooldown."""
+    global _tts_last_msg, _tts_last_time
+    if not text or not text.strip():
+        return
+    now = time.time()
+    if text.strip() == _tts_last_msg and (now - _tts_last_time) < TTS_COOLDOWN_SEC:
+        return
+    _tts_last_msg = text.strip()
+    _tts_last_time = now
+    t = threading.Thread(target=_speak_worker, args=(text.strip(),), daemon=True)
+    t.start()
 
 # 15 exercises from UI-PRMD, KIMORE + 8 custom (novel) exercises
 EXERCISE_NAMES = {
@@ -158,21 +200,35 @@ DD_LIST_H = DD_VISIBLE_ITEMS * DD_ITEM_H + 12
 DD_SB_W = 14            # scrollbar width
 
 # Only run quality prediction when pose is clearly moving (full sequence + recent window)
-MOTION_THRESHOLD = 0.028
-RECENT_MOTION_FRAMES = 16  # Must be moving in last N frames too (stops score rising after you sit)
+# Balanced: high enough to avoid idle/jitter, low enough so real exercise passes
+MOTION_THRESHOLD = 0.018
+RECENT_MOTION_FRAMES = 10
+# When model has joint attention: gate quality/reps by motion in attended body parts (graph-based pose)
+ATTENTION_MOTION_THRESHOLD = 0.002
 
 
 def get_demo_path(exercise: str):
-    """Return path to demo video: data/demos first, then data/demos_cache."""
+    """Return path to demo video in data/demos (populate via scripts/download_kaggle_demos.py)."""
     base_local = os.path.join(DEMO_DIR, exercise)
     for ext in DEMO_EXTENSIONS:
         p = base_local + ext
         if os.path.isfile(p):
             return p
-    cache_mp4 = os.path.join(DEMOS_CACHE_DIR, exercise + ".mp4")
-    if os.path.isfile(cache_mp4):
-        return cache_mp4
     return None
+
+
+def get_step_image_paths(exercise: str):
+    """Return sorted list of paths to step images for exercise: data/step_images/<exercise>/step_01.jpg, etc."""
+    import glob
+    folder = os.path.join(STEP_IMAGES_DIR, exercise)
+    if not os.path.isdir(folder):
+        return []
+    paths = []
+    for ext in (".jpg", ".jpeg", ".png", ".bmp"):
+        paths.extend(glob.glob(os.path.join(folder, "*" + ext)))
+    # Sort by filename so step_01, step_02, ... or 1.jpg, 2.png order
+    paths.sort(key=lambda p: (os.path.basename(p).lower(), p))
+    return paths
 
 
 def _is_youtube_url(url: str) -> bool:
@@ -318,10 +374,10 @@ def draw_header(screen, score, exercise, dd_open, dd_scroll, font_m, font_s, w, 
 
 
 def draw_left_panel(screen, left_x, left_y, left_w, left_h, demo_surf, exercise, font_m, font_s, youtube_url, downloading_exercise=None):
-    """Draw the reference/demo panel: video surface, or 'Loading demo...', or placeholder + optional YouTube button."""
+    """Draw section 1: reference/demo video."""
     pygame.draw.rect(screen, PANEL_BG, (left_x, left_y, left_w, left_h))
     pygame.draw.rect(screen, DARK, (left_x, left_y, left_w, left_h), 1)
-    title = font_s.render("Reference / Demo", True, GRAY)
+    title = font_s.render("1. Reference / Demo", True, GRAY)
     screen.blit(title, (left_x + 12, left_y + 8))
     ex_name = truncate(font_m, EXERCISE_NAMES.get(exercise, exercise), left_w - 24)
     ex_txt = font_m.render(ex_name, True, WHITE)
@@ -352,6 +408,46 @@ def draw_left_panel(screen, left_x, left_y, left_w, left_h, demo_surf, exercise,
             screen.blit(yt_txt, (btn_rect.centerx - yt_txt.get_width() // 2, btn_rect.centery - yt_txt.get_height() // 2))
             return btn_rect
     return None
+
+
+def draw_middle_panel(screen, mid_x, mid_y, mid_w, mid_h, exercise, step_paths, current_step_index, font_m, font_s):
+    """Draw the step-by-step images/poses panel. Shows one image at a time or strip; current_step_index cycles 0..len(step_paths)-1."""
+    pygame.draw.rect(screen, PANEL_BG, (mid_x, mid_y, mid_w, mid_h))
+    pygame.draw.rect(screen, DARK, (mid_x, mid_y, mid_w, mid_h), 1)
+    title = font_s.render("2. Steps / Pose reference", True, GRAY)
+    screen.blit(title, (mid_x + 12, mid_y + 8))
+    ex_name = truncate(font_m, EXERCISE_NAMES.get(exercise, exercise), mid_w - 24)
+    ex_txt = font_m.render(ex_name, True, WHITE)
+    screen.blit(ex_txt, (mid_x + 12, mid_y + 28))
+    content_y = mid_y + 52
+    content_h = mid_h - 52
+    if step_paths:
+        idx = current_step_index % max(1, len(step_paths))
+        path = step_paths[idx]
+        try:
+            img = cv2.imread(path)
+            if img is not None:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img_rgb = np.rot90(img_rgb)
+                step_surf = pygame.surfarray.make_surface(img_rgb)
+            else:
+                step_surf = None
+        except Exception:
+            step_surf = None
+        if step_surf is not None:
+            scaled = scale_fit(step_surf, mid_w - 16, content_h - 28)
+            sx = mid_x + (mid_w - scaled.get_width()) // 2
+            sy = content_y + (content_h - 28 - scaled.get_height()) // 2
+            screen.blit(scaled, (sx, sy))
+        step_lbl = font_s.render(f"Step {idx + 1} of {len(step_paths)}", True, GRAY)
+        screen.blit(step_lbl, (mid_x + (mid_w - step_lbl.get_width()) // 2, content_y + content_h - 24))
+    else:
+        msg = font_s.render("No step images for this exercise.", True, GRAY)
+        screen.blit(msg, (mid_x + 20, content_y + 24))
+        hint = font_s.render(f"Add: {STEP_IMAGES_DIR}/{exercise}/", True, GRAY)
+        screen.blit(hint, (mid_x + 20, content_y + 44))
+        sub = font_s.render("step_01.jpg, step_02.png, ...", True, GRAY)
+        screen.blit(sub, (mid_x + 20, content_y + 62))
 
 
 def draw_footer(screen, reps, target, feedback, font_m, font_s, w, h):
@@ -416,8 +512,10 @@ def _draw_loading_screen(screen, w, h, msg="Loading..."):
     pygame.display.flip()
 
 
-def _draw_loading_ui(screen, w, h, msg, font_m, font_s, left_w):
+def _draw_loading_ui(screen, w, h, msg, font_m, font_s, left_w, mid_w=0):
     """Draw full UI shell with loading message in the right (camera) panel so layout appears immediately."""
+    if mid_w <= 0:
+        mid_w = max(280, int(w * STEPS_FRAC))
     screen.fill(BG)
     # Header (no score, no dropdown open)
     pygame.draw.rect(screen, HEADER_BG, (0, 0, w, HEADER_H))
@@ -428,11 +526,14 @@ def _draw_loading_ui(screen, w, h, msg, font_m, font_s, left_w):
     dx = w - DD_W - PAD
     pygame.draw.rect(screen, PANEL_BG, (dx, 12, DD_W, 40))
     screen.blit(font_s.render("Exercise", True, GRAY), (dx + 12, 22))
-    # Left panel
+    # Panel 1: Demo
     pygame.draw.rect(screen, PANEL_BG, (0, VIDEO_Y, left_w, VIDEO_H))
-    screen.blit(font_s.render("Reference / Demo", True, GRAY), (12, VIDEO_Y + 8))
-    # Right panel: loading message
-    rx = left_w + (w - left_w) // 2 - 120
+    screen.blit(font_s.render("1. Reference / Demo", True, GRAY), (12, VIDEO_Y + 8))
+    # Panel 2: Step images
+    pygame.draw.rect(screen, PANEL_BG, (left_w, VIDEO_Y, mid_w, VIDEO_H))
+    screen.blit(font_s.render("2. Steps / Pose", True, GRAY), (left_w + 12, VIDEO_Y + 8))
+    # Panel 3: loading message
+    rx = left_w + mid_w + (w - left_w - mid_w) // 2 - 120
     ry = VIDEO_Y + VIDEO_H // 2 - 20
     screen.blit(font_m.render(msg, True, WHITE), (rx, ry))
     # Footer
@@ -447,7 +548,7 @@ def _load_backend_worker(result_dict, config, model_path, use_simplified):
     """Run in thread: heavy imports, camera, model. Sets result_dict['ready'] and entries or result_dict['error']."""
     try:
         from src.pose_extraction import PoseExtractor
-        from src.preprocessing import PoseBuffer, sequence_motion_energy, recent_motion_energy
+        from src.preprocessing import PoseBuffer, sequence_motion_energy, recent_motion_energy, attention_weighted_motion
         from src.inference import InferenceEngine
         from src.models.st_gcn import build_rehab_grading_model, build_simplified_model
         from src.joint_analysis import detect_errors, get_feedback_from_score
@@ -469,8 +570,10 @@ def _load_backend_worker(result_dict, config, model_path, use_simplified):
         if not cap.isOpened():
             result_dict["error"] = "Could not open webcam."
             return
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cam_w = rt.get("camera_width", 320)
+        cam_h = rt.get("camera_height", 240)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_w)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_h)
 
         extractor = PoseExtractor(
             min_detection_confidence=pose_cfg.get("min_detection_confidence", 0.5),
@@ -483,8 +586,8 @@ def _load_backend_worker(result_dict, config, model_path, use_simplified):
         else:
             model = build_simplified_model(num_joints=num_joints, in_channels=3, sequence_length=seq_len)
             engine = InferenceEngine(model=model)
-        motion_ctr = MotionRepCounter(threshold=0.002, min_peak_distance=6)
-        score_ctr = RepetitionCounter(threshold=0.35, min_peak_distance=8, window_size=12)
+        motion_ctr = MotionRepCounter(threshold=0.002, min_peak_distance=8)
+        score_ctr = RepetitionCounter(threshold=0.35, min_peak_distance=10, window_size=12)
 
         result_dict["cap"] = cap
         result_dict["extractor"] = extractor
@@ -494,12 +597,14 @@ def _load_backend_worker(result_dict, config, model_path, use_simplified):
         result_dict["score_ctr"] = score_ctr
         result_dict["sequence_motion_energy"] = sequence_motion_energy
         result_dict["recent_motion_energy"] = recent_motion_energy
+        result_dict["attention_weighted_motion"] = attention_weighted_motion
         result_dict["detect_errors"] = detect_errors
         result_dict["get_feedback_from_score"] = get_feedback_from_score
         result_dict["highlight_joints"] = highlight_joints
         result_dict["save_session"] = save_session
         result_dict["export_for_power_bi"] = export_for_power_bi
         result_dict["lerp"] = lerp
+        result_dict["inference_interval_frames"] = rt.get("inference_interval_frames", 4)
         result_dict["ready"] = True
     except Exception as e:
         result_dict["error"] = str(e)
@@ -526,10 +631,11 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
     font_l = get_font(26, bold=True)
     font_m = get_font(20)
     font_s = get_font(16)
-    left_w = max(320, int(w * LEFT_PANEL_FRAC))
+    left_w = max(280, int(w * DEMO_FRAC))
+    mid_w = max(280, int(w * STEPS_FRAC))
 
     # Show full UI shell immediately so user sees the app layout
-    _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w)
+    _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w, mid_w)
 
     load_result = {}
     t = threading.Thread(
@@ -545,7 +651,7 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 return
-        _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w)
+        _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w, mid_w)
         clock.tick(20)
 
     if load_result.get("error"):
@@ -563,6 +669,8 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
     score_ctr = load_result["score_ctr"]
     sequence_motion_energy = load_result["sequence_motion_energy"]
     recent_motion_energy = load_result["recent_motion_energy"]
+    attention_weighted_motion_fn = load_result["attention_weighted_motion"]
+    inference_interval = load_result.get("inference_interval_frames", 4)
     detect_errors = load_result["detect_errors"]
     get_feedback_from_score = load_result["get_feedback_from_score"]
     highlight_joints = load_result["highlight_joints"]
@@ -595,8 +703,8 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             if cap.isOpened():
                 demo_cap = cap
                 demo_clip_start_time = time.time()
-                # Skip intro: start at exercise clip
-                demo_cap.set(cv2.CAP_PROP_POS_MSEC, DEMO_SKIP_INTRO_SEC * 1000)
+                skip_sec, _ = get_demo_clip(ex)
+                demo_cap.set(cv2.CAP_PROP_POS_MSEC, skip_sec * 1000)
             downloading_demo = None
             return
         yt_url = _get_youtube_demo_url(ex)
@@ -615,10 +723,13 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
                 if cap.isOpened():
                     demo_cap = cap
                     demo_clip_start_time = time.time()
-                    demo_cap.set(cv2.CAP_PROP_POS_MSEC, DEMO_SKIP_INTRO_SEC * 1000)
+                    skip_sec, _ = get_demo_clip(ex)
+                    demo_cap.set(cv2.CAP_PROP_POS_MSEC, skip_sec * 1000)
         else:
             downloading_demo = None
     open_demo_for(exercise)
+    step_paths = get_step_image_paths(exercise)
+    step_cycle_start = time.time()  # for cycling step images every few seconds
     youtube_btn_rect = None  # set each frame by draw_left_panel when no demo + has URL
     dd_scroll = 0           # scroll offset for dropdown (0 = top)
     session_on = False
@@ -629,6 +740,7 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
     start_time = None
 
     feedback_msg = "Perform the exercise"
+    last_spoken_feedback = None  # only speak when feedback changes
     running = True
     while running:
         for ev in pygame.event.get():
@@ -696,6 +808,7 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
                             exercise = ex_list[idx]
                             motion_ctr.set_exercise(exercise)
                             open_demo_for(exercise)
+                            step_paths = get_step_image_paths(exercise)
                             dd_open = False
                     # Click on scrollbar track/thumb: jump to position
                     elif dx + DD_W - DD_SB_W <= mx <= dx + DD_W and dly <= my < dly + DD_LIST_H and n > DD_VISIBLE_ITEMS:
@@ -731,42 +844,57 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
         if has_pose:
             buffer.add(landmarks)
             frame_count += 1
+            # Only count reps during an active session so idle/jitter doesn't increase count
             if session_on:
                 motion_ctr.update(landmarks)
-            if buffer.is_ready() and (frame_count % 2 == 0):
+            if buffer.is_ready() and (frame_count % max(1, inference_interval) == 0):
                 seq = buffer.get_sequence()
                 motion_energy = sequence_motion_energy(seq)
                 recent_energy = recent_motion_energy(seq, last_n_frames=RECENT_MOTION_FRAMES)
-                if motion_energy >= MOTION_THRESHOLD and recent_energy >= MOTION_THRESHOLD:
-                    has_valid_motion = True
-                    score = engine.predict(seq)
-                    if session_on:
-                        session_scores.append(score)
-                        score_ctr.update(score, frame_count)
+                motion_passed = motion_energy >= MOTION_THRESHOLD and recent_energy >= MOTION_THRESHOLD
+                # Run model; with joint attention, gate quality/reps by motion in attended body parts (graph pose)
+                score, joint_weights = engine.predict(seq)
+                has_valid_motion = True  # we have a new score to show
+                if joint_weights is not None:
+                    att_motion = attention_weighted_motion_fn(seq, joint_weights, last_n_frames=RECENT_MOTION_FRAMES)
+                    attention_motion_ok = att_motion >= ATTENTION_MOTION_THRESHOLD
+                else:
+                    attention_motion_ok = motion_passed  # fallback when model has no joint attention
+                if session_on and attention_motion_ok:
+                    score_ctr.update(score, frame_count)
+                    session_scores.append(score)
+                if attention_motion_ok:
                     errors, err_joints = detect_errors(landmarks, exercise)
                     if errors:
                         feedback_msg = errors[0]
                         frame = highlight_joints(frame, landmarks, err_joints)
                     else:
                         feedback_msg = get_feedback_from_score(score)
-                    session_fb.append(feedback_msg)
+                    if session_on:
+                        session_fb.append(feedback_msg)
                 else:
                     feedback_msg = "Perform the exercise"
         else:
             feedback_msg = "Move into camera view"
+        # Audio: speak feedback when it changes (TTS)
+        if feedback_msg != last_spoken_feedback:
+            last_spoken_feedback = feedback_msg
+            speak_feedback(feedback_msg)
 
         if has_valid_motion:
-            display_score = lerp(display_score, score, 0.12)
+            # Lerp quickly toward model score so quality % actually increases when you do well
+            display_score = lerp(display_score, score, 0.28)
         else:
-            # When idle: decay quickly so "—" appears soon after you stop moving
-            display_score = lerp(display_score, 0.0, 0.14)
+            # When idle: decay slowly so last score stays visible (was 0.14)
+            display_score = lerp(display_score, 0.0, 0.06)
         reps = max(motion_ctr.reps, score_ctr.count)
 
         # Demo video: time-based playback so it runs at real speed (independent of app FPS)
-        if demo_cap is not None and demo_cap.isOpened() and demo_clip_start_time is not None:
+        if demo_cap is not None and demo_cap.isOpened() and demo_clip_start_time is not None and demo_exercise is not None:
+            skip_sec, clip_sec = get_demo_clip(demo_exercise)
             elapsed = time.time() - demo_clip_start_time
-            position_sec = elapsed % DEMO_CLIP_DURATION_SEC  # loop within clip
-            seek_msec = (DEMO_SKIP_INTRO_SEC + position_sec) * 1000
+            position_sec = elapsed % clip_sec  # loop within exercise clip
+            seek_msec = (skip_sec + position_sec) * 1000
             demo_cap.set(cv2.CAP_PROP_POS_MSEC, seek_msec)
             ret, demo_f = demo_cap.read()
             if ret:
@@ -789,26 +917,29 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             surf = pygame.Surface((frame.shape[1], frame.shape[0]))
             surf.fill((50, 55, 65))
 
-        left_w = max(320, int(w * LEFT_PANEL_FRAC))
-        right_w = w - left_w
+        left_w = max(280, int(w * DEMO_FRAC))
+        mid_w = max(280, int(w * STEPS_FRAC))
+        right_w = w - left_w - mid_w
         right_surf = scale_fit(surf, right_w, VIDEO_H)
+        step_index = int((time.time() - step_cycle_start) / 3) % max(1, len(step_paths)) if step_paths else 0
 
         screen.fill(BG)
-        # Left panel: reference / demo (returns YouTube button rect when no demo and not loading)
+        # Section 1: Demo video
         youtube_btn_rect = draw_left_panel(
             screen, 0, VIDEO_Y, left_w, VIDEO_H,
             demo_frame_surf, exercise, font_m, font_s,
             EXERCISE_YOUTUBE.get(exercise, ""),
             downloading_exercise=downloading_demo,
         )
-        # Right panel: you (live)
+        # Section 2: Step images / pose reference
+        draw_middle_panel(screen, left_w, VIDEO_Y, mid_w, VIDEO_H, exercise, step_paths, step_index, font_m, font_s)
+        # Section 3: Live camera
         rw, rh = right_surf.get_size()
-        rx = left_w + (right_w - rw) // 2
+        rx = left_w + mid_w + (right_w - rw) // 2
         ry = VIDEO_Y + (VIDEO_H - rh) // 2
         screen.blit(right_surf, (rx, ry))
-        # Label over right panel
-        you_lbl = font_s.render("You (Live)", True, GRAY)
-        screen.blit(you_lbl, (left_w + 12, VIDEO_Y + 8))
+        you_lbl = font_s.render("3. You (Live)", True, GRAY)
+        screen.blit(you_lbl, (left_w + mid_w + 12, VIDEO_Y + 8))
 
         if show_summary and summary_data:
             draw_summary(screen, *summary_data, font_l, font_m, w, h)

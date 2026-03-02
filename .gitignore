@@ -4,14 +4,14 @@ models/*.h5
 models/*.weights
 models/*_manifest.json
 
-# ---- Dataset files (large; use .gitkeep for folder structure) ----
+# ---- Obsolete / cache (demos now in data/demos only) ----
+data/demos_cache/
+
+# ---- Dataset files (large) ----
 data/**/*.npy
 data/**/*.npz
 data/**/*.csv
 data/**/*.txt
-# Keep .gitkeep files
-!data/.gitkeep
-!data/**/.gitkeep
 
 # ---- Runtime outputs ----
 sessions/

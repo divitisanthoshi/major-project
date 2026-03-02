@@ -1,0 +1,120 @@
+# Curated video sources for training (and optional demo clips)
+# Real YouTube URLs from PT/rehab channels (educational). Only use videos you have
+# permission to use. See docs/TRAINING_VIDEOS.md for legal note.
+#
+# When YouTube is not available: add direct video URLs in config/github_sources.yaml
+# under direct_downloads, then run with --also-github config/github_sources.yaml
+#
+# quality: good (→0.85), moderate (→0.55), poor (→0.25)
+# Each URL is downloaded as <exercise>_<quality>_<index>.mp4 for video_to_skeleton.py
+
+exercises:
+  deep_squat:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=X8GT128He-g"   # How to Rehab the Deep Squat - progressions
+      - "https://www.youtube.com/watch?v=GNK7ynSiaYc"   # FMS Corrective Exercise: Deep Squat
+  hurdle_step:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=2lKrxN_0aYo"   # FMS Hurdle Step Progression and Corrections
+  inline_lunge:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=3zVrh37QqC8"   # How to Do Lunges - PT guide
+  side_lunge:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=1D_tsUSW3ZY"   # Side Lunges Demonstration
+      - "https://www.youtube.com/watch?v=RtjEwRa12XE"   # Side Lunges: How To, Muscles Worked
+  sit_to_stand:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=qveKmiXEkIQ"   # How to Do a Sit to Stand - PT guide
+      - "https://www.youtube.com/watch?v=s_7fAaj6uxk"   # Sit to Stand | MedBridge
+  standing_leg_raise:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=EWGR5mTPzsU"   # Straight Leg Raise - How To Do Properly
+  shoulder_abduction:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=Ok8_fx1MZkE"   # Shoulder abduction in scapular plane
+      - "https://www.youtube.com/watch?v=hIw_umXNtIw"   # Active Assisted Shoulder Abduction
+  shoulder_extension:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=aqjE4ABVxOQ"   # Shoulder Extension with Resistance | MedBridge
+  shoulder_rotation:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=uu7WTuzDGik"   # Shoulder External Rotation - Physio REHAB
+      - "https://www.youtube.com/watch?v=BY7UKjJMx2A"   # Correct Form Shoulder External Rotation
+  shoulder_scaption:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=Ok8_fx1MZkE"   # Shoulder exercise - Abduction in scapular plane
+  hip_abduction:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=jTdr-e_GOQA"   # Side-lying Hip Abduction Exercise
+      - "https://www.youtube.com/watch?v=dBQXWsdrnfo"   # Gluteus Medius - Side-Lying Hip Abduction
+  trunk_rotation:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=fBQ1nMmf3b0"   # Seated Trunk Rotation - Ask Doctor Jo
+      - "https://www.youtube.com/watch?v=IhP0LP-wyxQ"   # Trunk Rotation Exercise - Ask Doctor Jo
+  squat:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=WbKT5b8ydmM"   # Squat Exercise - Physical Therapy
+  leg_raise:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=EWGR5mTPzsU"   # Straight Leg Raise - How To Do Properly
+      - "https://www.youtube.com/watch?v=2YsQvQNpFiI"   # Straight Leg Raise
+  reach_and_retrieve:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=68NQdp2y-JM"   # Reaching - functional activity
+      - "https://www.youtube.com/watch?v=_aJqJzt-U2s"   # Functional Reach Test
+  wall_pushup:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=dUAxTiVOhbA"   # Wall Push Up - arms, chest, abdominal strength
+      - "https://www.youtube.com/watch?v=QStCPnL6WwE"   # Push up against wall - rehabilitation
+  heel_raise:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=iZO2ncn-weM"   # How to do a Heel Raise - Calf Raise
+      - "https://www.youtube.com/watch?v=HmgXnST4Mdw"   # Calf Raise - Physio REHAB progression
+  bird_dog:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=G4mX4StOvQE"   # Bird Dog Exercise - Beginner and Standard
+      - "https://www.youtube.com/watch?v=ww-6lRXvI9Y"  # Physical Therapy - Bird Dog Exercise
+  glute_bridge:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=WEvLyLsV0xs"   # Glute Bridge
+      - "https://www.youtube.com/watch?v=Xgtkb8e6_vk"   # ACL Post-Op: Glute Bridge
+  clamshell:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=gFyIjunfbbg"   # How to Do the Clamshell Exercise
+      - "https://www.youtube.com/watch?v=k2-Wq7WCS0I"  # Clamshell for Foot, Hip, Knee Pain
+  chin_tuck:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=vhFGQxDVzF8"   # Chin tucks for neck pain - Physio REHAB
+      - "https://www.youtube.com/watch?v=KqR1EoEmq9c"   # Correct Way to Do Chin Tucks
+  marching_in_place:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=ns7i65g5gDM"   # Marching on the Spot - Balance & Leg Strength
+      - "https://www.youtube.com/watch?v=e_uIJdhwnj4"   # Marching in Place - Health Care Professionals
+  step_up:
+    quality: good
+    urls:
+      - "https://www.youtube.com/watch?v=UwlBah4dx-8"   # Step Up Exercise
+      - "https://www.youtube.com/watch?v=2g6G_GpsBoc"   # Step Ups - PT Knee Exercises

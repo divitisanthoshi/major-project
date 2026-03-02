@@ -1,2 +1,0 @@
-# Cached YouTube demo clips (first 60s) are saved here when no local data/demos/<exercise>.mp4 exists.
-# Filled automatically by the app. Add to .gitignore if you don't want to commit them.
