@@ -69,18 +69,52 @@ FOOTER_H = 124
 VIDEO_Y = HEADER_H
 VIDEO_H = WIN_H - HEADER_H - FOOTER_H
 PAD = 24
-# Three sections: 1=Demo video, 2=Step images/poses, 3=Live camera
-DEMO_FRAC = 0.28   # fraction of content width for demo
-STEPS_FRAC = 0.28  # fraction for step-by-step images
-LIVE_FRAC = 0.44   # fraction for live camera (largest)
+# Layout: left half = demo (top) + step images (bottom); right half = live camera
+# Fraction of left column height for demo (rest = step images). 0.5 = 50-50.
+LEFT_DEMO_FRAC = 0.5
+DEMO_FRAC = 0.28        # used only for loading fallback width
+STEPS_FRAC = 0.28
+LIVE_FRAC = 0.44
 DEMO_DIR = "data/demos"
+EXERCISES_VIDEOS_IMPORT_DIR = "data/exercises_videos_import"  # per-exercise subfolders, e.g. deep_squat/deep_squat_good_01.mp4 (checked first)
+EXERCISES_VIDEOS_DIR = "Exercises Videos"  # UI demo videos (after import folder)
+DEMOS_CACHE_DIR = "data/demos_cache"  # cached YouTube demo clips
 STEP_IMAGES_DIR = "data/step_images"  # per-exercise folders: step_01.jpg, step_02.png, etc.
 DEMO_EXTENSIONS = (".mp4", ".webm", ".avi")
+# Filename stems in Exercises Videos that map to each exercise (for get_demo_path)
+EXERCISE_DEMO_STEMS = {
+    "bird_dog": ["bird dog", "bird_dog"],
+    "chin_tuck": ["chin tuck", "chin_tuck"],
+    "clamshell": ["clamshell", "clamshells"],
+    "deep_squat": ["deep squat", "deep_squat", "functional movement screen"],
+    "glute_bridge": ["glute bridge", "glute_bridge"],
+    "heel_raise": ["heel raise", "heel raises", "heel_raise"],
+    "hip_abduction": ["hip abduction", "hip adduction", "hip_abduction"],
+    "hurdle_step": ["hurdle step", "hurdle_step"],
+    "inline_lunge": ["inline lunge", "inline_lunge"],
+    "leg_raise": ["leg raise", "leg raises", "lying leg raises", "leg_raise", "standing leg raises"],
+    "marching_in_place": ["marching in place", "marching_in_place"],
+    "reach_and_retrieve": ["reach and retrieve", "reach_and_retrieve"],
+    "shoulder_abduction": ["shoulder abduction", "shoulder_abduction"],
+    "shoulder_extension": ["shoulder extension", "shoulder flexion", "shoulder_extension"],
+    "shoulder_rotation": ["shoulder rotation", "shoulder_rotation"],
+    "shoulder_scaption": ["shoulder scaption", "shoulder_scaption"],
+    "side_lunge": ["side lunge", "side_lunge"],
+    "sit_to_stand": ["sit to stand", "sit_to_stand"],
+    "squat": ["squat", "squats", "squat"],
+    "standing_leg_raise": ["standing leg raise", "standing leg raises", "standing_leg_raise"],
+    "step_up": ["step up", "step-up", "step_up"],
+    "trunk_rotation": ["trunk rotation", "trunk rotations", "trunk_rotation"],
+    "wall_pushup": ["wall push up", "wall push ups", "wall push-up", "wall_pushup"],
+}
 DEMO_YT_MAX_DURATION_SEC = 60  # download only first 60s for in-app playback
 # Show only the exercise clip: skip intro, then loop this duration
 DEMO_SKIP_INTRO_SEC = 5   # default skip (intro/title)
 DEMO_CLIP_DURATION_SEC = 45  # default clip length to loop
-DEMO_FLIP_FOR_TEXT = True  # flip demo frame so on-video text is not mirrored
+DEMO_FLIP_FOR_TEXT = False  # do not flip demo — keep on-video text readable (not mirrored)
+# Loop demo continuously (smooth frame-by-frame; no per-frame seeking)
+DEMO_BOOMERANG = False  # True = play forward then backward (requires backward seek)
+DEMO_PLAYBACK_SPEED = 2.5  # 1.0 = normal; 2.5 = 2.5x speed
 # Per-exercise (skip_sec, clip_duration_sec) for videos with long intros (~5 min). Add keys only for those.
 DEMO_EXERCISE_CLIP = {
     "shoulder_rotation": (300, 120),   # skip 5 min intro, then 2 min exercise loop
@@ -207,8 +241,45 @@ RECENT_MOTION_FRAMES = 10
 ATTENTION_MOTION_THRESHOLD = 0.002
 
 
+def _normalize_demo_stem(name: str) -> str:
+    """Lowercase, no extension, collapse spaces/dashes to single space."""
+    base = os.path.splitext(name)[0].strip().lower()
+    base = base.replace("-", " ").replace("_", " ")
+    base = " ".join(base.split())
+    return base
+
+
 def get_demo_path(exercise: str):
-    """Return path to demo video in data/demos (populate via scripts/download_kaggle_demos.py)."""
+    """Return path to demo video: prefer data/exercises_videos_import/<exercise>/, then Exercises Videos, then data/demos."""
+    # 1) Prefer exercises_videos_import per-exercise folder (e.g. deep_squat/deep_squat_good_01.mp4)
+    import_dir = os.path.join(EXERCISES_VIDEOS_IMPORT_DIR, exercise)
+    if os.path.isdir(import_dir):
+        for f in sorted(os.listdir(import_dir)):
+            if f.lower().endswith(DEMO_EXTENSIONS):
+                return os.path.join(import_dir, f)
+    # 2) Exercises Videos: match by filename stem
+    if os.path.isdir(EXERCISES_VIDEOS_DIR):
+        allowed_stems = EXERCISE_DEMO_STEMS.get(exercise, [])
+        # Also match display name from EXERCISE_NAMES
+        if exercise in EXERCISE_NAMES:
+            display = EXERCISE_NAMES[exercise].lower().replace("-", " ")
+            if display not in allowed_stems:
+                allowed_stems = list(allowed_stems) + [display, display.replace(" ", "_")]
+        for f in os.listdir(EXERCISES_VIDEOS_DIR):
+            if not f.lower().endswith((".mp4", ".webm", ".avi")):
+                continue
+            stem = _normalize_demo_stem(f)
+            # Long YouTube titles: use first part before " - "
+            if " - " in stem:
+                stem = stem.split(" - ")[0].strip()
+            if stem in allowed_stems:
+                return os.path.join(EXERCISES_VIDEOS_DIR, f)
+            if stem.replace(" ", "_") == exercise:
+                return os.path.join(EXERCISES_VIDEOS_DIR, f)
+            # Partial match: e.g. "how to lying leg raises" matches "leg_raise"
+            if any(allowed in stem for allowed in allowed_stems):
+                return os.path.join(EXERCISES_VIDEOS_DIR, f)
+    # 3) Fallback: data/demos/<exercise>.mp4
     base_local = os.path.join(DEMO_DIR, exercise)
     for ext in DEMO_EXTENSIONS:
         p = base_local + ext
@@ -308,6 +379,22 @@ def scale_fit(surface, dest_w, dest_h):
     return pygame.transform.smoothscale(surface, (nw, nh))
 
 
+def scale_fill(surface, dest_w, dest_h):
+    """Scale surface to fill dest_w x dest_h (zoom in), center crop. No mirror."""
+    sw, sh = surface.get_size()
+    if sw <= 0 or sh <= 0 or dest_w <= 0 or dest_h <= 0:
+        return surface
+    scale = max(dest_w / sw, dest_h / sh)
+    nw, nh = int(sw * scale), int(sh * scale)
+    scaled = pygame.transform.smoothscale(surface, (nw, nh))
+    out = pygame.Surface((dest_w, dest_h))
+    out.fill(PANEL_BG)
+    x = (dest_w - nw) // 2
+    y = (dest_h - nh) // 2
+    out.blit(scaled, (x, y))
+    return out
+
+
 def draw_header(screen, score, exercise, dd_open, dd_scroll, font_m, font_s, w, h):
     pygame.draw.rect(screen, HEADER_BG, (0, 0, w, HEADER_H))
     pygame.draw.line(screen, DARK, (0, HEADER_H), (w, HEADER_H), 1)
@@ -385,6 +472,7 @@ def draw_left_panel(screen, left_x, left_y, left_w, left_h, demo_surf, exercise,
     content_y = left_y + 52
     content_h = left_h - 52
     if demo_surf is not None:
+        # Full demo visible: scale to fit inside panel, no cropping
         scaled = scale_fit(demo_surf, left_w - 16, content_h - 8)
         sx = left_x + (left_w - scaled.get_width()) // 2
         sy = content_y + (content_h - scaled.get_height()) // 2
@@ -397,7 +485,7 @@ def draw_left_panel(screen, left_x, left_y, left_w, left_h, demo_surf, exercise,
     else:
         msg = font_s.render("No demo video for this exercise.", True, GRAY)
         screen.blit(msg, (left_x + 20, content_y + 24))
-        hint = font_s.render(f"Add: {DEMO_DIR}/{exercise}.mp4", True, GRAY)
+        hint = font_s.render(f"Add video to: {EXERCISES_VIDEOS_DIR}/ or {DEMO_DIR}/", True, GRAY)
         screen.blit(hint, (left_x + 20, content_y + 48))
         if youtube_url:
             btn_y = content_y + content_h - 44
@@ -424,17 +512,22 @@ def draw_middle_panel(screen, mid_x, mid_y, mid_w, mid_h, exercise, step_paths, 
     if step_paths:
         idx = current_step_index % max(1, len(step_paths))
         path = step_paths[idx]
+        step_surf = None
         try:
-            img = cv2.imread(path)
-            if img is not None:
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                img_rgb = np.rot90(img_rgb)
-                step_surf = pygame.surfarray.make_surface(img_rgb)
-            else:
-                step_surf = None
+            # Load with pygame so orientation is correct (no mirror); fallback to OpenCV if needed
+            step_surf = pygame.image.load(path).convert()
         except Exception:
-            step_surf = None
+            try:
+                img = cv2.imread(path)
+                if img is not None:
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    # NumPy (H,W,3) -> pygame expects (W,H,3); rot90(-1) = 90 CW, correct reading
+                    img_rgb = np.rot90(img_rgb, -1)
+                    step_surf = pygame.surfarray.make_surface(img_rgb)
+            except Exception:
+                step_surf = None
         if step_surf is not None:
+            # Full step image visible: scale to fit inside panel, no cropping
             scaled = scale_fit(step_surf, mid_w - 16, content_h - 28)
             sx = mid_x + (mid_w - scaled.get_width()) // 2
             sy = content_y + (content_h - 28 - scaled.get_height()) // 2
@@ -512,10 +605,13 @@ def _draw_loading_screen(screen, w, h, msg="Loading..."):
     pygame.display.flip()
 
 
-def _draw_loading_ui(screen, w, h, msg, font_m, font_s, left_w, mid_w=0):
-    """Draw full UI shell with loading message in the right (camera) panel so layout appears immediately."""
-    if mid_w <= 0:
-        mid_w = max(280, int(w * STEPS_FRAC))
+def _draw_loading_ui(screen, w, h, msg, font_m, font_s, left_w=None, mid_w=0):
+    """Draw full UI shell matching main layout: left = demo (top) + steps (bottom), right = loading message."""
+    if left_w is None or left_w <= 0:
+        left_w = max(320, w // 2)
+    right_w = w - left_w
+    top_left_h = int(VIDEO_H * LEFT_DEMO_FRAC)
+    bottom_left_h = VIDEO_H - top_left_h
     screen.fill(BG)
     # Header (no score, no dropdown open)
     pygame.draw.rect(screen, HEADER_BG, (0, 0, w, HEADER_H))
@@ -526,16 +622,16 @@ def _draw_loading_ui(screen, w, h, msg, font_m, font_s, left_w, mid_w=0):
     dx = w - DD_W - PAD
     pygame.draw.rect(screen, PANEL_BG, (dx, 12, DD_W, 40))
     screen.blit(font_s.render("Exercise", True, GRAY), (dx + 12, 22))
-    # Panel 1: Demo
-    pygame.draw.rect(screen, PANEL_BG, (0, VIDEO_Y, left_w, VIDEO_H))
+    # Left half: Panel 1 (demo) top, Panel 2 (steps) bottom — same as main app
+    pygame.draw.rect(screen, PANEL_BG, (0, VIDEO_Y, left_w, top_left_h))
     screen.blit(font_s.render("1. Reference / Demo", True, GRAY), (12, VIDEO_Y + 8))
-    # Panel 2: Step images
-    pygame.draw.rect(screen, PANEL_BG, (left_w, VIDEO_Y, mid_w, VIDEO_H))
-    screen.blit(font_s.render("2. Steps / Pose", True, GRAY), (left_w + 12, VIDEO_Y + 8))
-    # Panel 3: loading message
-    rx = left_w + mid_w + (w - left_w - mid_w) // 2 - 120
+    pygame.draw.rect(screen, PANEL_BG, (0, VIDEO_Y + top_left_h, left_w, bottom_left_h))
+    screen.blit(font_s.render("2. Steps / Pose reference", True, GRAY), (12, VIDEO_Y + top_left_h + 8))
+    # Right half: loading message (same area as live camera)
+    rx = left_w + (right_w - font_m.size(msg)[0]) // 2
     ry = VIDEO_Y + VIDEO_H // 2 - 20
     screen.blit(font_m.render(msg, True, WHITE), (rx, ry))
+    screen.blit(font_s.render("3. You (Live)", True, GRAY), (left_w + 12, VIDEO_Y + 8))
     # Footer
     fy = h - FOOTER_H
     pygame.draw.rect(screen, FOOTER_BG, (0, fy, w, FOOTER_H))
@@ -587,7 +683,8 @@ def _load_backend_worker(result_dict, config, model_path, use_simplified):
             model = build_simplified_model(num_joints=num_joints, in_channels=3, sequence_length=seq_len)
             engine = InferenceEngine(model=model)
         motion_ctr = MotionRepCounter(threshold=0.002, min_peak_distance=8)
-        score_ctr = RepetitionCounter(threshold=0.35, min_peak_distance=10, window_size=12)
+        # Lower threshold so correct form (high model score) counts as rep; aligned with pose reference / good execution
+        score_ctr = RepetitionCounter(threshold=0.28, min_peak_distance=8, window_size=10)
 
         result_dict["cap"] = cap
         result_dict["extractor"] = extractor
@@ -631,11 +728,10 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
     font_l = get_font(26, bold=True)
     font_m = get_font(20)
     font_s = get_font(16)
-    left_w = max(280, int(w * DEMO_FRAC))
-    mid_w = max(280, int(w * STEPS_FRAC))
+    left_w = max(320, w // 2)  # same as main loop so layout does not change after load
 
-    # Show full UI shell immediately so user sees the app layout
-    _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w, mid_w)
+    # Show full UI shell immediately (same layout as after load: left = demo+steps, right = camera/msg)
+    _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w)
 
     load_result = {}
     t = threading.Thread(
@@ -651,7 +747,7 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 return
-        _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w, mid_w)
+        _draw_loading_ui(screen, w, h, "Loading model & camera…", font_m, font_s, left_w)
         clock.tick(20)
 
     if load_result.get("error"):
@@ -687,16 +783,20 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
     demo_exercise = None
     demo_frame_surf = None
     demo_clip_start_time = None  # real-time start for time-based playback
+    demo_last_frame_time = None  # throttle reads to video FPS for smooth playback
+    demo_forward = True  # for boomerang: play forward then backward
     downloading_demo = None  # exercise name while downloading
     demo_ready_list = []    # thread appends exercise when download done
 
     def open_demo_for(ex):
-        nonlocal demo_cap, demo_exercise, demo_frame_surf, demo_clip_start_time, downloading_demo
+        nonlocal demo_cap, demo_exercise, demo_frame_surf, demo_clip_start_time, demo_last_frame_time, demo_forward, downloading_demo
         if demo_cap is not None:
             demo_cap.release()
             demo_cap = None
         demo_exercise = ex
         demo_frame_surf = None
+        demo_last_frame_time = None
+        demo_forward = True
         path = get_demo_path(ex)
         if path:
             cap = cv2.VideoCapture(path)
@@ -729,6 +829,10 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             downloading_demo = None
     open_demo_for(exercise)
     step_paths = get_step_image_paths(exercise)
+    # Reps from pose reference: when live pose matches a reference step, count rep (independent of quality score)
+    from src.reference_rep_counter import load_reference_poses, ReferenceRepCounter
+    ref_poses = load_reference_poses(step_paths)
+    ref_rep_counter = ReferenceRepCounter(ref_poses) if any(ref_poses) else None
     step_cycle_start = time.time()  # for cycling step images every few seconds
     youtube_btn_rect = None  # set each frame by draw_left_panel when no demo + has URL
     dd_scroll = 0           # scroll offset for dropdown (0 = top)
@@ -755,14 +859,17 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
                         if session_on and start_time:
                             dur = time.time() - start_time
                             avg = (sum(session_scores) / len(session_scores)) * 100 if session_scores else 0
-                            save_session(exercise, target_reps, max(motion_ctr.reps, score_ctr.count), session_scores, session_fb, dur)
+                            reps_done = ref_rep_counter.count if ref_rep_counter is not None else motion_ctr.reps
+                            save_session(exercise, target_reps, reps_done, session_scores, session_fb, dur)
                             export_for_power_bi()
-                            summary_data = (exercise, target_reps, max(motion_ctr.reps, score_ctr.count), avg, dur)
+                            summary_data = (exercise, target_reps, reps_done, avg, dur)
                 elif ev.key == pygame.K_SPACE:
                     if show_summary:
                         show_summary = False
                         motion_ctr.reset()
                         score_ctr.reset()
+                        if ref_rep_counter is not None:
+                            ref_rep_counter.reset()
                         session_on = True
                         start_time = time.time()
                         session_scores.clear()
@@ -772,12 +879,16 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
                         if session_on:
                             motion_ctr.reset()
                             score_ctr.reset()
+                            if ref_rep_counter is not None:
+                                ref_rep_counter.reset()
                             start_time = time.time()
                             session_scores.clear()
                             session_fb.clear()
                 elif ev.key == pygame.K_r:
                     motion_ctr.reset()
                     score_ctr.reset()
+                    if ref_rep_counter is not None:
+                        ref_rep_counter.reset()
                     engine.reset_reps()
             elif ev.type == pygame.MOUSEWHEEL and dd_open:
                 ex_list = EXERCISE_ORDER
@@ -809,6 +920,8 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
                             motion_ctr.set_exercise(exercise)
                             open_demo_for(exercise)
                             step_paths = get_step_image_paths(exercise)
+                            ref_poses = load_reference_poses(step_paths)
+                            ref_rep_counter = ReferenceRepCounter(ref_poses) if any(ref_poses) else None
                             dd_open = False
                     # Click on scrollbar track/thumb: jump to position
                     elif dx + DD_W - DD_SB_W <= mx <= dx + DD_W and dly <= my < dly + DD_LIST_H and n > DD_VISIBLE_ITEMS:
@@ -861,8 +974,7 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
                 else:
                     attention_motion_ok = motion_passed  # fallback when model has no joint attention
                 if session_on and attention_motion_ok:
-                    score_ctr.update(score, frame_count)
-                    session_scores.append(score)
+                    session_scores.append(score)  # quality from model only; reps from reference pose below
                 if attention_motion_ok:
                     errors, err_joints = detect_errors(landmarks, exercise)
                     if errors:
@@ -882,31 +994,42 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             speak_feedback(feedback_msg)
 
         if has_valid_motion:
-            # Lerp quickly toward model score so quality % actually increases when you do well
-            display_score = lerp(display_score, score, 0.28)
+            # Quality from model only (independent of reps)
+            lerp_rate = 0.42 if score >= 0.5 else 0.28
+            display_score = lerp(display_score, score, lerp_rate)
         else:
-            # When idle: decay slowly so last score stays visible (was 0.14)
             display_score = lerp(display_score, 0.0, 0.06)
-        reps = max(motion_ctr.reps, score_ctr.count)
+        # Reps from pose reference: when live pose matches reference step, count increases (independent of quality)
+        if session_on and has_pose and ref_rep_counter is not None:
+            ref_rep_counter.update(landmarks, frame_count)
+        reps = (ref_rep_counter.count if (ref_rep_counter is not None and ref_rep_counter.has_references()) else motion_ctr.reps)
 
-        # Demo video: time-based playback so it runs at real speed (independent of app FPS)
-        if demo_cap is not None and demo_cap.isOpened() and demo_clip_start_time is not None and demo_exercise is not None:
+        # Demo video: sequential frame read at video FPS for smooth playback; loop (and boomerang) continuously
+        if demo_cap is not None and demo_cap.isOpened() and demo_exercise is not None:
             skip_sec, clip_sec = get_demo_clip(demo_exercise)
-            elapsed = time.time() - demo_clip_start_time
-            position_sec = elapsed % clip_sec  # loop within exercise clip
-            seek_msec = (skip_sec + position_sec) * 1000
-            demo_cap.set(cv2.CAP_PROP_POS_MSEC, seek_msec)
-            ret, demo_f = demo_cap.read()
-            if ret:
-                if DEMO_FLIP_FOR_TEXT:
-                    demo_f = cv2.flip(demo_f, 1)
-                demo_f = cv2.cvtColor(demo_f, cv2.COLOR_BGR2RGB)
-                demo_f = np.rot90(demo_f)
-                try:
-                    demo_frame_surf = pygame.surfarray.make_surface(demo_f)
-                except Exception:
-                    demo_frame_surf = pygame.Surface((demo_f.shape[1], demo_f.shape[0]))
-                    demo_frame_surf.fill((50, 55, 65))
+            fps = max(15, min(60, demo_cap.get(cv2.CAP_PROP_FPS) or 30))
+            frame_interval = 1.0 / (fps * DEMO_PLAYBACK_SPEED)
+            now = time.time()
+            if demo_last_frame_time is None or (now - demo_last_frame_time) >= frame_interval:
+                demo_last_frame_time = now
+                ret, demo_f = demo_cap.read()
+                if not ret:
+                    demo_cap.set(cv2.CAP_PROP_POS_MSEC, skip_sec * 1000)
+                    ret, demo_f = demo_cap.read()
+                else:
+                    pos_msec = demo_cap.get(cv2.CAP_PROP_POS_MSEC)
+                    if pos_msec >= (skip_sec + clip_sec) * 1000:
+                        demo_cap.set(cv2.CAP_PROP_POS_MSEC, skip_sec * 1000)
+                if ret:
+                    if DEMO_FLIP_FOR_TEXT:
+                        demo_f = cv2.flip(demo_f, 1)
+                    demo_f = cv2.cvtColor(demo_f, cv2.COLOR_BGR2RGB)
+                    demo_f = np.rot90(demo_f)
+                    try:
+                        demo_frame_surf = pygame.surfarray.make_surface(demo_f)
+                    except Exception:
+                        demo_frame_surf = pygame.Surface((demo_f.shape[1], demo_f.shape[0]))
+                        demo_frame_surf.fill((50, 55, 65))
 
         # Live camera surface (right panel)
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -917,29 +1040,43 @@ def run_app(model_path=None, use_simplified=False, config_path=None):
             surf = pygame.Surface((frame.shape[1], frame.shape[0]))
             surf.fill((50, 55, 65))
 
-        left_w = max(280, int(w * DEMO_FRAC))
-        mid_w = max(280, int(w * STEPS_FRAC))
-        right_w = w - left_w - mid_w
+        # Layout (same as loading screen): left half = demo (top) + steps (bottom), right = live
+        left_w = max(320, w // 2)
+        right_w = w - left_w
+        top_left_h = int(VIDEO_H * LEFT_DEMO_FRAC)
+        bottom_left_h = VIDEO_H - top_left_h
+
         right_surf = scale_fit(surf, right_w, VIDEO_H)
         step_index = int((time.time() - step_cycle_start) / 3) % max(1, len(step_paths)) if step_paths else 0
 
         screen.fill(BG)
-        # Section 1: Demo video
+        # Section 1: Demo video (top-left)
         youtube_btn_rect = draw_left_panel(
-            screen, 0, VIDEO_Y, left_w, VIDEO_H,
+            screen, 0, VIDEO_Y, left_w, top_left_h,
             demo_frame_surf, exercise, font_m, font_s,
             EXERCISE_YOUTUBE.get(exercise, ""),
             downloading_exercise=downloading_demo,
         )
-        # Section 2: Step images / pose reference
-        draw_middle_panel(screen, left_w, VIDEO_Y, mid_w, VIDEO_H, exercise, step_paths, step_index, font_m, font_s)
-        # Section 3: Live camera
+        # Section 2: Step images / pose reference (bottom-left)
+        draw_middle_panel(
+            screen,
+            0,
+            VIDEO_Y + top_left_h,
+            left_w,
+            bottom_left_h,
+            exercise,
+            step_paths,
+            step_index,
+            font_m,
+            font_s,
+        )
+        # Section 3: Live camera (right half)
         rw, rh = right_surf.get_size()
-        rx = left_w + mid_w + (right_w - rw) // 2
+        rx = left_w + (right_w - rw) // 2
         ry = VIDEO_Y + (VIDEO_H - rh) // 2
         screen.blit(right_surf, (rx, ry))
         you_lbl = font_s.render("3. You (Live)", True, GRAY)
-        screen.blit(you_lbl, (left_w + mid_w + 12, VIDEO_Y + 8))
+        screen.blit(you_lbl, (left_w + 12, VIDEO_Y + 8))
 
         if show_summary and summary_data:
             draw_summary(screen, *summary_data, font_l, font_m, w, h)

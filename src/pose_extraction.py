@@ -104,3 +104,36 @@ def extract_pose_from_frame(
         extractor.close()
         return result
     return extractor.extract(frame)
+
+
+def extract_pose_from_static_image(image_path_or_array, model_complexity: int = 1) -> Optional[np.ndarray]:
+    """
+    Extract pose landmarks from a static image (e.g. step reference image).
+    Uses MediaPipe with static_image_mode=True. Returns (33, 3) or None.
+
+    Args:
+        image_path_or_array: Path to image file (str) or BGR numpy array (H, W, 3).
+        model_complexity: 0, 1, or 2.
+
+    Returns:
+        landmarks (33, 3) float32, or None if no pose detected.
+    """
+    if isinstance(image_path_or_array, str):
+        frame = cv2.imread(image_path_or_array)
+        if frame is None:
+            return None
+    else:
+        frame = np.asarray(image_path_or_array)
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    pose_static = mp.solutions.pose.Pose(
+        static_image_mode=True,
+        model_complexity=model_complexity,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
+    result = pose_static.process(rgb)
+    pose_static.close()
+    if not result.pose_landmarks:
+        return None
+    landmarks = np.array([[lm.x, lm.y, lm.z] for lm in result.pose_landmarks.landmark], dtype=np.float32)
+    return landmarks
